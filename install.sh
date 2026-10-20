@@ -83,9 +83,10 @@ Terminal=false
 Categories=Utility;
 StartupNotify=false
 DESKTOP
-  # (an AppImage needs FUSE 2 to open as one file; without it, it still opens by unpacking itself each time)
-  if ! ldconfig -p 2>/dev/null | grep -q 'libfuse\.so\.2'; then
-    echo "(no FUSE 2 here: moomu will start a little slower. Your package manager's libfuse2 / fuse2 fixes that)"
+  # (its AppImage runtime opens it with fusermount3 or fusermount, no libfuse2 needed; without either it still opens
+  # by unpacking itself each time, just slower)
+  if ! command -v fusermount3 >/dev/null && ! command -v fusermount >/dev/null; then
+    echo "(no FUSE here: moomu will start a little slower. Your package manager's fuse3 fixes that)"
   fi
 fi
 
