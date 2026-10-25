@@ -28,6 +28,10 @@ LBASE="${XDG_DATA_HOME:-$HOME/.local/share}"
 if [ "${1:-}" = "uninstall" ]; then
   say "removing moomu..."
   pkill -x moomu 2>/dev/null || true
+  # its own computer (the VM, if it was set up): on Linux QEMU runs on its own, so it's stopped before its folder goes
+  # (on a Mac it ran inside moomu and went with it)
+  vmpid="$(cat "$LBASE/moomu/vm/qemu.pid" 2>/dev/null || true)"
+  [ -n "$vmpid" ] && kill "$vmpid" 2>/dev/null && sleep 1 || true
   if [ "$OS" = mac ]; then
     rm -rf /Applications/moomu.app "$HOME/Library/Application Support/moomu" "$HOME/.moomu"
     rm -f "$HOME/Library/LaunchAgents/app.moomu.login.plist"
@@ -35,7 +39,7 @@ if [ "${1:-}" = "uninstall" ]; then
     rm -rf "$LBASE/moomu" "$HOME/.moomu"
     rm -f "$HOME/.local/bin/moomu" "$LBASE/applications/moomu.desktop" "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/moomu.desktop"
   fi
-  say "done. Your brain folder, your projects and Claude Code are still here."
+  say "done (its own computer too, if it had one). Your brain folder, your projects and Claude Code are still here."
   exit 0
 fi
 
