@@ -5,8 +5,9 @@
 #   3. installs Claude Code with Anthropic's own installer if it isn't there yet (you sign in to it in moomu's first
 #      run, in Claude Code's own window: moomu never sees your login)
 #   4. installs a private copy of Node for moomu's browser if there's none (nothing system-wide)
-#   5. downloads her voice (Chatterbox Turbo by Resemble AI, ~500 MB) and her ears (Moonshine, 136-257 MB), once, so
-#      she can talk and listen as soon as she opens
+#   5. downloads her voice (Chatterbox Turbo by Resemble AI, ~500 MB) and her ears, once, so she can talk and listen as
+#      soon as she opens. Her ears are ONE model picked for this PC by moomu itself (`moomu.exe --fetch-ears`: Parakeet
+#      by NVIDIA, ~660 MB, or Moonshine, 140-270 MB, on a PC too small or slow for it)
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # (PowerShell 5's progress bar makes downloads many times slower)
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -76,7 +77,7 @@ try {
     )
     $missing = @($voiceFiles | Where-Object { $f = Join-Path $voice $_[0]; -not ((Test-Path $f) -and (Get-Item $f).Length -eq $_[1]) })
     if ($missing.Count -gt 0) {
-        Write-Host "downloading its voice and ears (about 650-750 MB, once)..."
+        Write-Host "downloading its voice (about 500 MB, once)..."
         try {
             foreach ($v in $missing) {
                 $f = Join-Path $voice $v[0]
@@ -87,38 +88,10 @@ try {
         } catch { Write-Host "(its voice will finish downloading when moomu opens)" }
     }
 
-    # her ears (Moonshine, MIT): the medium model on a PC with 16 GB or more, the small one below (as the app picks)
-    $ears = if ((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory -ge 15032385536) { "medium" } else { "small" }
-    $earDir = Join-Path $env:LOCALAPPDATA "moomu\moomu\models\moonshine-$ears"
-    New-Item -ItemType Directory -Force $earDir | Out-Null
-    $earFiles = if ($ears -eq "medium") { @(
-        @("adapter.ort", 3651296, "3f2a287def57cc094367a0eec3c4f5fc36a32ec420e86764b696920991b20281"),
-        @("cross_kv.ort", 11643776, "642f6e21cd305be79342207c6f9e6b681d469d55bc48c72b27b84846fb71fd1e"),
-        @("decoder_kv.ort", 146972408, "193bb366492b74fc4ad338c6778e8d8eb916aaa11b5aa264f9057f4db7759486"),
-        @("encoder.ort", 94705376, "12915e76ebac7dd287c5ea63965d06103a53ba1ce242a4a34f318f3958c60c37"),
-        @("frontend.model.ort", 28720, "95768855c70c8251eeecc05fedf69999da1b8ab16f605c9f457fd3354b0ad6b5"),
-        @("frontend.weights.ort", 11889560, "5ac941f490cbe035b335b99a414cc393d62d4c6f9f2423495b286870d271d709"),
-        @("streaming_config.json", 513, "28e83b7a28e91472692a035e0dae3116422ae43aeb2bef5ed822c44ce89b88af"),
-        @("tokenizer.bin", 249974, "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d")
-    ) } else { @(
-        @("adapter.ort", 2870368, "c665f742364febad597cc9ac1e0b341ffbee0e24a1466e2f3bde95e6e4771762"),
-        @("cross_kv.ort", 5356536, "e2d3417144e9514055ebfefe8dcc4c0a55a55adcb8530435844c75c53e352bf6"),
-        @("decoder_kv.ort", 81878600, "1a05465b1dd955858dfcbee039c0020fb5dd982b0f5094c34e61735d518d771b"),
-        @("encoder.ort", 44148576, "2d4d973e91e8aca08c51e7e7efa28a46ab265b63d809d5294d18b86bcd85b993"),
-        @("frontend.model.ort", 26944, "09b1210ae30dc5f0f3e45f0ebab914c254741323114f53fbbe5ae62cca35058f"),
-        @("frontend.weights.ort", 7769464, "7ef97521bd4bad3928f5bb6808586f4fcc6e92bd5990394112eed7d4052ec338"),
-        @("streaming_config.json", 512, "26f02b6afb22d60871a5efd85c3d38e569cc0ddb6c5eb6e93d3260152ae8a47a"),
-        @("tokenizer.bin", 249974, "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d")
-    ) }
-    try {
-        foreach ($v in $earFiles) {
-            $f = Join-Path $earDir $v[0]
-            if ((Test-Path $f) -and (Get-Item $f).Length -eq $v[1]) { continue }
-            Invoke-WebRequest "https://download.moonshine.ai/model/$ears-streaming-en/quantized_26_08_21/$($v[0])" -OutFile "$f.part" -UseBasicParsing
-            if ((Get-FileHash "$f.part" -Algorithm SHA256).Hash.ToLower() -ne $v[2]) { Remove-Item "$f.part"; throw "checksum" }
-            Move-Item "$f.part" $f -Force
-        }
-    } catch { Write-Host "(its ears will finish downloading when moomu opens)" }
+    # her ears: moomu looks at this PC (memory, the CPU, a second's speed test) and downloads the one model that suits
+    # it, the same code on every system (earsetup.cpp); its progress shows here. Anything that fails is fetched by moomu
+    # itself when it opens
+    try { Start-Process $exe -ArgumentList '--fetch-ears' -NoNewWindow -Wait } catch { Write-Host "(its ears will finish downloading when moomu opens)" }
 
     Write-Host "done. opening moomu"
     Start-Process $exe
