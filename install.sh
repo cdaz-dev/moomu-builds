@@ -6,8 +6,9 @@
 #   3. installs Claude Code with Anthropic's own installer if it isn't there yet (you sign in to it in moomu's
 #      first run, in Claude Code's own window: moomu never sees your login)
 #   4. installs a private copy of Node for moomu's browser if there's none (in ~/.moomu, nothing system-wide)
-#   5. downloads her voice (Chatterbox Turbo by Resemble AI, ~500 MB) and her ears (Moonshine, 136-257 MB), once, so
-#      she can talk and listen as soon as she opens
+#   5. downloads her voice (Chatterbox Turbo by Resemble AI, ~500 MB) and her ears, once, so she can talk and listen as
+#      soon as she opens. Her ears are ONE model picked for this computer by moomu itself (`moomu --fetch-ears`: Parakeet
+#      by NVIDIA, ~660 MB, or Moonshine, 140-270 MB, on a computer too small or slow for it)
 # Run it again to update. To remove moomu:  curl -fsSL https://moomu.app/install | bash -s uninstall
 set -euo pipefail
 BUILDS="cdaz-dev/moomu-builds"
@@ -79,8 +80,8 @@ else
 [Desktop Entry]
 Type=Application
 Name=moomu
-GenericName=AI companion
-Comment=A companion in your notch that works with your Claude Code (or Codex)
+GenericName=AI assistant
+Comment=Lives in your notch and works with your Claude Code (or Codex)
 Exec="$app"
 Icon=$LBASE/moomu/moomu.png
 Terminal=false
@@ -137,7 +138,7 @@ onnx/conditional_decoder_q4.onnx 2179022 dccb7a6cea3472dc7f7d070eeb70ade18e6327f
 onnx/conditional_decoder_q4.onnx_data 246397384 b5c5317e0b79a1a19dd3d5e2b2091ea06b15716716ab801a54eaeb906c6971ec
 FILES
 if [ "$need" = 1 ]; then
-  say "downloading its voice and ears (about 650-750 MB, once)..."
+  say "downloading its voice (about 500 MB, once)..."
   while read -r name size sha; do
     [ "$(size "$voice/$name")" = "$size" ] && continue
     if curl -fL --progress-bar "https://huggingface.co/ResembleAI/chatterbox-turbo-ONNX/resolve/d21799bd0354adb85e348b8a0442a8405110a2cf/$name" -o "$voice/$name.part" &&
@@ -155,39 +156,15 @@ onnx/conditional_decoder_q4.onnx_data 246397384 b5c5317e0b79a1a19dd3d5e2b2091ea0
 FILES
 fi
 
-# her ears (Moonshine, MIT): the medium model on a Mac with 16 GB or more, the small one below (as the app picks)
-if [ "$OS" = mac ]; then mem="$(sysctl -n hw.memsize 2>/dev/null || echo 0)"; else mem=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0) * 1024 )); fi
-if [ "$mem" -ge 15032385536 ]; then ears=medium; else ears=small; fi
-ed="$DATA/models/moonshine-$ears"
-mkdir -p "$ed"
-if [ "$ears" = medium ]; then list="$(cat <<'FILES'
-adapter.ort 3651296 3f2a287def57cc094367a0eec3c4f5fc36a32ec420e86764b696920991b20281
-cross_kv.ort 11643776 642f6e21cd305be79342207c6f9e6b681d469d55bc48c72b27b84846fb71fd1e
-decoder_kv.ort 146972408 193bb366492b74fc4ad338c6778e8d8eb916aaa11b5aa264f9057f4db7759486
-encoder.ort 94705376 12915e76ebac7dd287c5ea63965d06103a53ba1ce242a4a34f318f3958c60c37
-frontend.model.ort 28720 95768855c70c8251eeecc05fedf69999da1b8ab16f605c9f457fd3354b0ad6b5
-frontend.weights.ort 11889560 5ac941f490cbe035b335b99a414cc393d62d4c6f9f2423495b286870d271d709
-streaming_config.json 513 28e83b7a28e91472692a035e0dae3116422ae43aeb2bef5ed822c44ce89b88af
-tokenizer.bin 249974 6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d
-FILES
-)"; else list="$(cat <<'FILES'
-adapter.ort 2870368 c665f742364febad597cc9ac1e0b341ffbee0e24a1466e2f3bde95e6e4771762
-cross_kv.ort 5356536 e2d3417144e9514055ebfefe8dcc4c0a55a55adcb8530435844c75c53e352bf6
-decoder_kv.ort 81878600 1a05465b1dd955858dfcbee039c0020fb5dd982b0f5094c34e61735d518d771b
-encoder.ort 44148576 2d4d973e91e8aca08c51e7e7efa28a46ab265b63d809d5294d18b86bcd85b993
-frontend.model.ort 26944 09b1210ae30dc5f0f3e45f0ebab914c254741323114f53fbbe5ae62cca35058f
-frontend.weights.ort 7769464 7ef97521bd4bad3928f5bb6808586f4fcc6e92bd5990394112eed7d4052ec338
-streaming_config.json 512 26f02b6afb22d60871a5efd85c3d38e569cc0ddb6c5eb6e93d3260152ae8a47a
-tokenizer.bin 249974 6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d
-FILES
-)"; fi
-printf '%s\n' "$list" | while read -r name size sha; do
-  [ "$(size "$ed/$name")" = "$size" ] && continue
-  if curl -fsSL "https://download.moonshine.ai/model/$ears-streaming-en/quantized_26_08_21/$name" -o "$ed/$name.part" &&
-     [ "$(sum "$ed/$name.part")" = "$sha" ]; then
-    mv -f "$ed/$name.part" "$ed/$name"
-  else rm -f "$ed/$name.part"; echo "(its ears will finish downloading when moomu opens)"; break; fi
-done
+# her ears: moomu looks at this computer (memory, the CPU, a second's speed test) and downloads the one model that suits
+# it, the same code on every system (earsetup.cpp). Anything that fails is fetched by moomu itself when it opens
+if [ "$OS" = mac ]; then
+  /Applications/moomu.app/Contents/MacOS/moomu --fetch-ears || true
+elif command -v fusermount3 >/dev/null || command -v fusermount >/dev/null; then
+  "$LBASE/moomu/moomu.AppImage" --fetch-ears || true
+else
+  (cd "$tmp" && APPIMAGE_EXTRACT_AND_RUN=1 "$LBASE/moomu/moomu.AppImage" --fetch-ears) || true
+fi
 
 say "done. opening moomu ✦"
 if [ "$OS" = mac ]; then open /Applications/moomu.app
